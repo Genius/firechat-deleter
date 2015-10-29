@@ -1,0 +1,12 @@
+{
+  "name": "firechat-deleter",
+  "version": "1.0.0",
+  "description": "Delete old messages from Firechat",
+  "dependencies": {
+    "event-stream": "^3.3.2",
+    "function-rate-limit": "^1.0.1",
+    "JSONStream": "^1.0.6",
+    "lodash": "^3.10.1",
+    "request": "^2.65.0"
+  }
+}
