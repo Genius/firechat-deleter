@@ -10,7 +10,6 @@ if (args._.length !== 3) {
   process.exit(1);
 }
 
-
 var chatUrl = args._[0];
 var firebaseSecret = args._[1];
 var timestamp = parseInt(args._[2], 10) * 1000;
