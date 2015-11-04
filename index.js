@@ -1,13 +1,13 @@
-var async = require('async');
 var es = require('event-stream');
 var JSONStream = require('JSONStream');
 var lodash = require('lodash');
 var rateLimit = require('function-rate-limit');
 var request = require('request');
 
-var FirechatDeleter = function(firechatUrl, firechatSecret, rateLimitParams) {
-  this.firechatUrl = firechatUrl;
-  this.firechatSecret = firechatSecret;
+var FirechatDeleter = function(args) {
+  this.firechatUrl = args.url;
+  this.firechatSecret = args.secret;
+  var rateLimitParams = args.rateLimit;
 
   if (rateLimitParams) {
     this._deleteMessage = rateLimit(
@@ -18,66 +18,45 @@ var FirechatDeleter = function(firechatUrl, firechatSecret, rateLimitParams) {
   }
 };
 
-var totalCount = 0;
-var deletedCount = 0;
-
 lodash.assign(FirechatDeleter.prototype, {
-  deleteOlder: function(oldestTimestamp) {
-    var queue = async.queue(function(room, roomCallback) {
-      console.log('downloading messages for', room.name);
-      var messagesStream = this._getMessagesStream(room);
-      messagesStream.pipe(
-        es.map(function(message, messageCallback) {
-          if (message.timestamp < oldestTimestamp) {
-            this._deleteMessage(room, message, function() {
-              messageCallback();
-            });
-          } else {
-            messageCallback();
-          }
-        }.bind(this))
-      ).on('end', function() { roomCallback(); });
-    }.bind(this));
+  totalCount: 0,
+  deletedCount: 0,
 
-    this._getRoomsStream().pipe(
-      es.mapSync(function(room) {
-        queue.push(room);
-      })
-    )
+  deleteOlder: function(cutoffTimestamp) {
+    var messagesStream = this._getMessagesStream();
+    messagesStream.pipe(
+      es.mapSync(function(message) {
+        ++this.totalCount;
+        if (message.timestamp < cutoffTimestamp) {
+          this._deleteMessage(message);
+        }
+      }.bind(this))
+    );
   },
 
-  _getRoomsStream: function() {
-    return request({url: this._getAllRoomsUrl() + '?auth=' + this.firechatSecret}).
-      pipe(JSONStream.parse('*'));
-  },
-
-  _getMessagesStream: function(room) {
-    return request({url: this._getAllMessagesUrl(room.id) + '?auth=' + this.firechatSecret}).
-      pipe(JSONStream.parse('*', function(message, messageIdTuple) {
-        return lodash.assign({id: messageIdTuple[0]}, message);
+  _getMessagesStream: function() {
+    return request({url: this._getEverythingUrl() + '?auth=' + this.firechatSecret}).
+      pipe(JSONStream.parse(['room-messages', true, true], function(message, keyPath) {
+        return lodash.assign({id: keyPath[2], roomId: keyPath[1]}, message);
       }));
   },
 
-  _deleteMessage: function(room, message, callback) {
-    var url = this._messageUrl(room.id, message.id);
-
+  _deleteMessage: function(message) {
+    var url = this._messageUrl(message.roomId, message.id);
     request.del(url + '?auth=' + this.firechatSecret).
       on('error', function(err) { console.error(err, url); }).
       on('response', function(response, body) {
-        if (response.statusCode !== 200) console.error(response.statusCode, url, body);
-        if (!(++count % 100)) {
-          console.log('deleted', count, 'messages');
-          callback();
+        if (response.statusCode !== 200) {
+          process.stderr.write(response.statusCode + " deleting " + url + ": " + body + "\n");
         }
-      });
+        if (!(++this.deletedCount % 100)) {
+          process.stdout.write("deleted " + this.deletedCount + " of " + this.totalCount + " messages\n");
+        }
+      }.bind(this));
   },
 
-  _getAllRoomsUrl: function() {
-    return this.firechatUrl + "/room-metadata.json";
-  },
-
-  _getAllMessagesUrl: function(roomId) {
-    return this.firechatUrl + "/room-messages/" + roomId + ".json";
+  _getEverythingUrl: function() {
+    return this.firechatUrl + ".json";
   },
 
   _messageUrl: function(roomId, messageId) {

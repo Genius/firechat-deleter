@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+
+var minimist = require('minimist');
+var FirechatDeleter = require('../index');
+
+var args = minimist(process.argv.slice(2));
+
+if (args._.length !== 3) {
+  process.stderr.write("Usage: firechat-deleter CHAT-URL FIREBASE-SECRET TIMESTAMP\n");
+  process.exit(1);
+}
+
+var chatUrl = args._[0];
+var firebaseSecret = args._[1];
+var timestamp = parseInt(args._[2], 10) * 1000;
+
+var deleterArgs = {url: chatUrl, secret: firebaseSecret};
+var rateLimitCount = args['rate-limit'];
+if (rateLimitCount) {
+  deleterArgs.rateLimit = {
+    count: rateLimitCount,
+    interval: 1000
+  };
+}
+
+var deleter = new FirechatDeleter(deleterArgs);
+deleter.deleteOlder(timestamp);
