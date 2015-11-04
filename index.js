@@ -18,9 +18,6 @@ var FirechatDeleter = function(args) {
   }
 };
 
-var totalCount = 0;
-var deletedCount = 0;
-
 lodash.assign(FirechatDeleter.prototype, {
   totalCount: 0,
   deletedCount: 0,
@@ -29,7 +26,7 @@ lodash.assign(FirechatDeleter.prototype, {
     var messagesStream = this._getMessagesStream();
     messagesStream.pipe(
       es.mapSync(function(message) {
-        ++totalCount;
+        ++this.totalCount;
         if (message.timestamp < oldestTimestamp) {
           this._deleteMessage(message);
         }
