@@ -22,12 +22,12 @@ lodash.assign(FirechatDeleter.prototype, {
   totalCount: 0,
   deletedCount: 0,
 
-  deleteOlder: function(oldestTimestamp) {
+  deleteOlder: function(cutoffTimestamp) {
     var messagesStream = this._getMessagesStream();
     messagesStream.pipe(
       es.mapSync(function(message) {
         ++this.totalCount;
-        if (message.timestamp < oldestTimestamp) {
+        if (message.timestamp < cutoffTimestamp) {
           this._deleteMessage(message);
         }
       }.bind(this))
